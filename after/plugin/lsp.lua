@@ -1,71 +1,78 @@
-local lsp = require("lsp-zero")
+local lsp_zero = require("lsp-zero")
 
-lsp.preset("recommended")
+lsp_zero.on_attach(function(client, bufnr)
+    -- see :help lsp-zero-keybindings
+    -- to learn the available actions
+    lsp_zero.default_keymaps({ buffer = bufnr })
+end)
 
-lsp.ensure_installed({
-    'tsserver',
-    'rust_analyzer',
-    'elmls',
+require('mason').setup({})
+require('mason-lspconfig').setup({
+    ensure_installed = {
+        'tsserver',
+        'elmls',
+    },
+    handlers = {
+        lsp_zero.default_setup,
+        elmls = function()
+            require('lspconfig').elmls.setup({
+                settings = { elmLS = { onlyUpdateDiagnosticsOnSave = true } }
+            })
+        end,
+    },
 })
+
+require('lspconfig.configs').roc_lsp = {
+    default_config = {
+        name = 'roc_lsp',
+        cmd = { 'roc_lang_server' },
+        filetypes = { 'roc' },
+        root_dir = require('lspconfig.util').root_pattern("*.roc", ".git")
+    }
+}
+
+require('lspconfig').roc_lsp.setup({})
 
 -- Fix Undefined global 'vim'
-lsp.nvim_workspace()
-
+local lua_opts = lsp_zero.nvim_lua_ls()
+require('lspconfig').lua_ls.setup(lua_opts)
 
 local cmp = require('cmp')
-local cmp_select = { behavior = cmp.SelectBehavior.Select }
-local cmp_mappings = lsp.defaults.cmp_mappings({
-    ['<C-p>'] = cmp.mapping.select_prev_item(cmp_select),
-    ['<C-n>'] = cmp.mapping.select_next_item(cmp_select),
-    ['<C-y>'] = cmp.mapping.confirm({ select = true }),
-    ["<C-Space>"] = cmp.mapping.complete(),
+local cmp_action = require('lsp-zero').cmp_action()
+
+cmp.setup({
+    mapping = cmp.mapping.preset.insert({
+        -- `Enter` key to confirm completion
+        ['<CR>'] = cmp.mapping.confirm({ select = false }),
+
+        -- Ctrl+Space to trigger completion menu
+        ['<C-Space>'] = cmp.mapping.complete(),
+
+        -- Navigate between snippet placeholder
+        ['<C-f>'] = cmp_action.luasnip_jump_forward(),
+        ['<C-b>'] = cmp_action.luasnip_jump_backward(),
+
+        -- Scroll up and down in the completion documentation
+        ['<C-u>'] = cmp.mapping.scroll_docs(-4),
+        ['<C-d>'] = cmp.mapping.scroll_docs(4),
+    })
 })
 
-cmp_mappings['<Tab>'] = nil
-cmp_mappings['<S-Tab>'] = nil
-
-lsp.setup_nvim_cmp({
-    mapping = cmp_mappings
+-- lsp.set_preferences({ suggest_lsp_servers = false, sign_icons = { error = 'E', warn = 'W', hint = 'H', info = 'I' } })
+lsp_zero.set_sign_icons({
+    error = '✘',
+    warn = '▲',
+    hint = '⚑',
+    info = '»'
 })
 
-lsp.set_preferences({
-    suggest_lsp_servers = false,
-    sign_icons = {
-        error = 'E',
-        warn = 'W',
-        hint = 'H',
-        info = 'I'
-    }
-})
-
-lsp.on_attach(function(client, bufnr)
-    local opts = { buffer = bufnr, remap = false }
-
-    vim.keymap.set("n", "gd", function() vim.lsp.buf.definition() end, opts)
-    vim.keymap.set("n", "K", function() vim.lsp.buf.hover() end, opts)
-    vim.keymap.set("n", "<leader>vws", function() vim.lsp.buf.workspace_symbol() end, opts)
-    vim.keymap.set("n", "<leader>vd", function() vim.diagnostic.open_float() end, opts)
-    vim.keymap.set("n", "[d", function() vim.diagnostic.goto_next() end, opts)
-    vim.keymap.set("n", "]d", function() vim.diagnostic.goto_prev() end, opts)
-    vim.keymap.set("n", "<leader>vca", function() vim.lsp.buf.code_action() end, opts)
-    vim.keymap.set("n", "<leader>vrr", function() vim.lsp.buf.references() end, opts)
-    vim.keymap.set("n", "<leader>vrn", function() vim.lsp.buf.rename() end, opts)
-    vim.keymap.set("i", "<C-h>", function() vim.lsp.buf.signature_help() end, opts)
-end)
-vim.filetype.add({
-    extension = {
-        roc = 'roc',
-    }
-})
-
-lsp.format_on_save({
+lsp_zero.format_on_save({
     format_opts = {
         async = false,
-        timeout_ms = 10000,
+        timeout_ms = 1000,
     },
     servers = {
         ['lua_ls'] = { 'lua' },
-        ['rust_analyzer'] = { 'rust' },
         ['elmls'] = { 'elm' },
         ['roc_lsp'] = { 'roc' },
         -- if you have a working setup with null-ls
@@ -73,20 +80,6 @@ lsp.format_on_save({
         -- ['null-ls'] = {'javascript', 'typescript'},
     }
 })
-
-lsp.setup()
-
-require('lspconfig.configs').my_new_lsp = {
-    default_config = {
-        name = 'roc_lsp',
-        cmd = { 'roc_ls' },
-        filetypes = { 'roc' },
-        root_dir = require('lspconfig.util').root_pattern({ '.git' })
-    }
-}
-
-require('lspconfig').my_new_lsp.setup({})
-
 
 vim.diagnostic.config({
     virtual_text = true
